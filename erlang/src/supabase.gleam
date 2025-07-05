@@ -9,11 +9,11 @@ import gleam/http
 import gleam/http/request
 import gleam/http/response.{type Response}
 import gleam/httpc
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
-import gleam/int
 import gleam/uri
 
 // You'''ll need an HTTP client. gleam/httpc is a common choice.
@@ -144,7 +144,8 @@ pub fn maybe_single(builder: QueryBuilder) -> QueryBuilder {
 }
 
 pub fn limit(builder: QueryBuilder, count: Int) -> QueryBuilder {
-  let new_filters = list.append(builder.filters, [#("limit", "", int.to_string(count))])
+  let new_filters =
+    list.append(builder.filters, [#("limit", "", int.to_string(count))])
   QueryBuilder(..builder, filters: new_filters)
 }
 
@@ -159,22 +160,35 @@ pub fn single(builder: QueryBuilder) -> QueryBuilder {
 }
 
 pub fn or(builder: QueryBuilder, filters: String) -> QueryBuilder {
-  let new_filters = list.append(builder.filters, [#("or", "", "(" <> filters <> ")")])
+  let new_filters =
+    list.append(builder.filters, [#("or", "", "(" <> filters <> ")")])
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn ilike(builder: QueryBuilder, column: String, value: String) -> QueryBuilder {
+pub fn ilike(
+  builder: QueryBuilder,
+  column: String,
+  value: String,
+) -> QueryBuilder {
   let new_filters = list.append(builder.filters, [#("ilike", column, value)])
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn in(builder: QueryBuilder, column: String, values: List(String)) -> QueryBuilder {
+pub fn in(
+  builder: QueryBuilder,
+  column: String,
+  values: List(String),
+) -> QueryBuilder {
   let values_str = "(" <> string.join(values, ",") <> ")"
   let new_filters = list.append(builder.filters, [#("in", column, values_str)])
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn not_eq(builder: QueryBuilder, column: String, value: String) -> QueryBuilder {
+pub fn not_eq(
+  builder: QueryBuilder,
+  column: String,
+  value: String,
+) -> QueryBuilder {
   let new_filters = list.append(builder.filters, [#("neq", column, value)])
   QueryBuilder(..builder, filters: new_filters)
 }
@@ -274,15 +288,13 @@ fn prepare_request_body(builder: QueryBuilder) -> String {
   }
 }
 
-
-
 pub fn execute(builder: QueryBuilder) -> Result(decode.Dynamic, SupabaseError) {
   case build_url(builder.client, builder) {
     Ok(url) -> {
       let headers = build_headers(builder.client)
       let method = string_to_http_method(builder.method)
       let body = prepare_request_body(builder)
-      
+
       // Build request directly from URL
       let req_result = case uri.parse(url) {
         Ok(parsed_uri) -> {
@@ -301,7 +313,7 @@ pub fn execute(builder: QueryBuilder) -> Result(decode.Dynamic, SupabaseError) {
         }
         Error(_) -> Error(InvalidUrl(url))
       }
-      
+
       case req_result {
         Ok(req) -> {
           case httpc.send(req) {
@@ -336,7 +348,7 @@ pub fn rpc(
   let url = string.concat([client.host, "/rest/v1/rpc/", function_name])
   let headers = build_headers(client)
   let body = json.to_string(params)
-  
+
   // Build request directly from URL for RPC
   case uri.parse(url) {
     Ok(parsed_uri) -> {
@@ -351,7 +363,7 @@ pub fn rpc(
           let #(key, value) = header
           request.set_header(req, key, value)
         })
-      
+
       case httpc.send(req) {
         Ok(response) -> handle_response(response)
         Error(_) -> Error(HttpRequestError("HTTP request failed"))

@@ -3,11 +3,11 @@ import gleam/dynamic/decode
 import gleam/http
 import gleam/http/request
 import gleam/http/response.{type Response}
+import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
-import gleam/int
 
 // FFI implementation would depend on the target platform
 // For Erlang target, we don't need the JavaScript FFI
@@ -89,38 +89,60 @@ pub fn lte(builder: QueryBuilder, column: String, value: String) -> QueryBuilder
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn like(builder: QueryBuilder, column: String, value: String) -> QueryBuilder {
+pub fn like(
+  builder: QueryBuilder,
+  column: String,
+  value: String,
+) -> QueryBuilder {
   let new_filters = list.append(builder.filters, [#("like", column, value)])
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn ilike(builder: QueryBuilder, column: String, value: String) -> QueryBuilder {
+pub fn ilike(
+  builder: QueryBuilder,
+  column: String,
+  value: String,
+) -> QueryBuilder {
   let new_filters = list.append(builder.filters, [#("ilike", column, value)])
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn not_eq(builder: QueryBuilder, column: String, value: String) -> QueryBuilder {
+pub fn not_eq(
+  builder: QueryBuilder,
+  column: String,
+  value: String,
+) -> QueryBuilder {
   let new_filters = list.append(builder.filters, [#("neq", column, value)])
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn in(builder: QueryBuilder, column: String, values: List(String)) -> QueryBuilder {
+pub fn in(
+  builder: QueryBuilder,
+  column: String,
+  values: List(String),
+) -> QueryBuilder {
   let values_str = "(" <> string.join(values, ",") <> ")"
   let new_filters = list.append(builder.filters, [#("in", column, values_str)])
   QueryBuilder(..builder, filters: new_filters)
 }
 
-pub fn order(builder: QueryBuilder, column: String, ascending: Bool) -> QueryBuilder {
+pub fn order(
+  builder: QueryBuilder,
+  column: String,
+  ascending: Bool,
+) -> QueryBuilder {
   let direction = case ascending {
     True -> "asc"
     False -> "desc"
   }
-  let new_filters = list.append(builder.filters, [#("order", column, direction)])
+  let new_filters =
+    list.append(builder.filters, [#("order", column, direction)])
   QueryBuilder(..builder, filters: new_filters)
 }
 
 pub fn limit(builder: QueryBuilder, count: Int) -> QueryBuilder {
-  let new_filters = list.append(builder.filters, [#("limit", "", int.to_string(count))])
+  let new_filters =
+    list.append(builder.filters, [#("limit", "", int.to_string(count))])
   QueryBuilder(..builder, filters: new_filters)
 }
 
@@ -139,7 +161,8 @@ pub fn maybe_single(builder: QueryBuilder) -> QueryBuilder {
 }
 
 pub fn or(builder: QueryBuilder, filters: String) -> QueryBuilder {
-  let new_filters = list.append(builder.filters, [#("or", "", "(" <> filters <> ")")])
+  let new_filters =
+    list.append(builder.filters, [#("or", "", "(" <> filters <> ")")])
   QueryBuilder(..builder, filters: new_filters)
 }
 
@@ -290,7 +313,7 @@ pub fn rpc(
   let body = json.to_string(params)
   let method = http.Post
   let req = build_request(url, method, headers, body)
-  
+
   case send_request(req) {
     Ok(response) -> handle_response(response)
     Error(e) -> Error(e)

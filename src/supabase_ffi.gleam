@@ -2,8 +2,7 @@ import gleam/dynamic
 import gleam/json
 import gleam/string
 import supabase.{
-  type Client, type QueryBuilder, create, eq, execute, from, insert,
-  select,
+  type Client, type QueryBuilder, create, eq, execute, from, insert, select,
 }
 
 pub fn create_client(url: String, key: String) -> Client {
