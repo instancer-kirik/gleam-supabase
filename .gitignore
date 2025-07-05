@@ -1,0 +1,54 @@
+# Gleam build artifacts
+build/
+*.beam
+*.ez
+
+# Dependencies
+deps/
+
+# Gleam cache
+.gleam/
+
+# IDE specific files
+.vscode/
+.idea/
+*.iml
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage/
+*.coverdata
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Node.js (for JavaScript target)
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Erlang/OTP
+erl_crash.dump
+*.crashdump
+
+# Documentation build
+doc/
+_build/
+
+# Local development
+.local/

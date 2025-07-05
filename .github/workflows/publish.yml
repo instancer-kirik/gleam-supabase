@@ -1,0 +1,119 @@
+name: Publish to Hex.pm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Publish Package
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Gleam
+      uses: erlef/setup-beam@v1
+      with:
+        gleam-version: '1.0.0'
+        otp-version: '26.0'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+    
+    - name: Verify version consistency
+      run: |
+        # Extract version from gleam.toml files
+        JS_VERSION=$(grep '^version' gleam.toml | cut -d '"' -f 2)
+        ERLANG_VERSION=$(grep '^version' erlang/gleam.toml | cut -d '"' -f 2)
+        
+        # Check if versions match
+        if [ "$JS_VERSION" != "$ERLANG_VERSION" ]; then
+          echo "Version mismatch between JavaScript ($JS_VERSION) and Erlang ($ERLANG_VERSION) targets!"
+          exit 1
+        fi
+        
+        # If triggered by workflow_dispatch, verify input matches gleam.toml
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$JS_VERSION" != "${{ github.event.inputs.version }}" ]; then
+            echo "Input version (${{ github.event.inputs.version }}) doesn't match gleam.toml version ($JS_VERSION)!"
+            exit 1
+          fi
+        fi
+        
+        echo "Package version: $JS_VERSION"
+    
+    - name: Download dependencies
+      run: |
+        gleam deps download
+        cd erlang && gleam deps download
+    
+    - name: Run tests
+      run: |
+        gleam test --target javascript
+        cd erlang && gleam test
+    
+    - name: Build documentation
+      run: gleam docs build
+    
+    - name: Check for HEX_API_KEY
+      run: |
+        if [ -z "${{ secrets.HEX_API_KEY }}" ]; then
+          echo "Error: HEX_API_KEY secret is not set!"
+          echo "Please add your Hex.pm API key as a repository secret."
+          echo "You can generate one at: https://hex.pm/settings/api_keys"
+          exit 1
+        fi
+    
+    - name: Publish to Hex.pm
+      env:
+        HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+      run: |
+        # Publish the package
+        gleam publish --yes
+        
+        echo "✅ Package published successfully to Hex.pm!"
+        echo "View at: https://hex.pm/packages/supabase"
+    
+    - name: Verify publication
+      run: |
+        VERSION=$(grep '^version' gleam.toml | cut -d '"' -f 2)
+        
+        # Wait a moment for Hex.pm to update
+        sleep 10
+        
+        # Check if package is available
+        if curl -s https://hex.pm/api/packages/supabase | grep -q "\"version\":\"$VERSION\""; then
+          echo "✅ Package version $VERSION is now available on Hex.pm!"
+        else
+          echo "⚠️  Package might take a few minutes to appear on Hex.pm"
+        fi
+    
+    - name: Create GitHub deployment
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const version = '${{ steps.version.outputs.version }}' || context.payload.release.tag_name.replace('v', '');
+          
+          await github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.sha,
+            task: 'deploy',
+            auto_merge: false,
+            required_contexts: [],
+            payload: {
+              version: version,
+              target: 'hex.pm'
+            },
+            environment: 'hex.pm',
+            description: `Deploy version ${version} to Hex.pm`
+          });

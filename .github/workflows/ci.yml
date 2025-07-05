@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        gleam-version: ['1.0.0']
+        otp-version: ['26.0']
+        node-version: ['18.x', '20.x']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Gleam
+      uses: erlef/setup-beam@v1
+      with:
+        gleam-version: ${{ matrix.gleam-version }}
+        otp-version: ${{ matrix.otp-version }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+    
+    - name: Cache Gleam dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/gleam
+          build
+        key: ${{ runner.os }}-gleam-${{ hashFiles('**/gleam.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-gleam-
+    
+    - name: Download dependencies
+      run: |
+        gleam deps download
+        cd erlang && gleam deps download
+    
+    - name: Check formatting
+      run: |
+        gleam format --check src test
+        cd erlang && gleam format --check src test
+    
+    - name: Run tests (JavaScript target)
+      run: gleam test --target javascript
+    
+    - name: Run tests (Erlang target)
+      run: cd erlang && gleam test
+    
+    - name: Build project (JavaScript target)
+      run: gleam build --target javascript
+    
+    - name: Build project (Erlang target)
+      run: cd erlang && gleam build
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Gleam
+      uses: erlef/setup-beam@v1
+      with:
+        gleam-version: '1.0.0'
+        otp-version: '26.0'
+    
+    - name: Download dependencies
+      run: |
+        gleam deps download
+        cd erlang && gleam deps download
+    
+    - name: Check format
+      run: |
+        gleam format --check src test
+        cd erlang && gleam format --check src test
+    
+    - name: Check for unused dependencies
+      run: |
+        gleam deps list
+        cd erlang && gleam deps list
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Gleam
+      uses: erlef/setup-beam@v1
+      with:
+        gleam-version: '1.0.0'
+        otp-version: '26.0'
+    
+    - name: Download dependencies
+      run: gleam deps download
+    
+    - name: Generate documentation
+      run: gleam docs build
+    
+    - name: Check documentation coverage
+      run: gleam docs build --check-links
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [test, lint, docs]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Gleam
+      uses: erlef/setup-beam@v1
+      with:
+        gleam-version: '1.0.0'
+        otp-version: '26.0'
+    
+    - name: Check if version changed
+      id: version
+      run: |
+        VERSION=$(grep '^version' gleam.toml | cut -d '"' -f 2)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        git fetch --tags
+        if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Create Release
+      if: steps.version.outputs.exists == 'false'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        release_name: Release v${{ steps.version.outputs.version }}
+        body: |
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+        draft: false
+        prerelease: false
